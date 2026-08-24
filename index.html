@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Axolotl World</title>
+<style>
+  :root{
+    --blue:#4FC3F7; --purple:#BA68C8; --pink:#F06292; --green:#66BB6A;
+    --deep:#062a4a; --deep2:#0a3d63;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0; height:100%; background:linear-gradient(#0a3d63,#062a4a); font-family:'Comic Sans MS','Trebuchet MS',sans-serif; overflow:hidden; touch-action:none;}
+  #wrap{position:relative; width:100vw; height:100vh; display:flex; align-items:center; justify-content:center;}
+  #stage{position:relative; width:min(96vw, 900px); aspect-ratio:16/10;}
+  canvas{width:100%; height:100%; display:block; border-radius:14px; box-shadow:0 0 0 4px #fff3, 0 10px 40px #000a; background:#0a3d63;}
+  .screen{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#fff; padding:4%; border-radius:14px; background:radial-gradient(circle at 50% 20%, #0f5c8f, #062a4a 80%); gap:14px;}
+  .hidden{display:none !important;}
+  h1{font-size:clamp(26px,6vw,48px); margin:0; letter-spacing:1px;
+     background:linear-gradient(90deg,var(--blue),var(--purple),var(--pink),var(--green));
+     -webkit-background-clip:text; background-clip:text; color:transparent;
+     animation:hue 5s linear infinite; text-shadow:0 4px 0 #0004;}
+  @keyframes hue{ to { filter:hue-rotate(360deg); } }
+  p{font-size:clamp(13px,2.4vw,18px); margin:2px 0; max-width:640px; line-height:1.5;}
+  .row{display:flex; gap:12px; flex-wrap:wrap; justify-content:center;}
+  button{font-family:inherit; font-size:clamp(15px,2.6vw,20px); font-weight:bold; color:#fff; border:none; border-radius:12px; padding:12px 22px; cursor:pointer; background:linear-gradient(180deg,var(--pink),var(--purple)); box-shadow:0 5px 0 #0005; transition:transform .08s;}
+  button:active{transform:translateY(4px); box-shadow:0 1px 0 #0005;}
+  button.alt{background:linear-gradient(180deg,var(--green),var(--blue));}
+  .swatch{width:54px; height:54px; border-radius:50%; border:4px solid #fff; cursor:pointer; box-shadow:0 4px 0 #0005;}
+  .swatch.sel{border-color:#FFD54F; transform:scale(1.12);}
+  #customPreview{width:140px; height:140px;}
+  #hud{position:absolute; top:8px; left:8px; right:56px; display:flex; justify-content:space-between; align-items:flex-start; color:#fff; font-weight:bold; font-size:clamp(12px,2vw,16px); pointer-events:none; text-shadow:0 2px 3px #000a;}
+  #hud .box{background:#00000055; padding:5px 10px; border-radius:10px;}
+  #pad{position:absolute; left:10px; bottom:10px; display:grid; grid-template-columns:52px 52px 52px; grid-template-rows:52px 52px 52px; gap:4px;}
+  #pad button{width:52px; height:52px; padding:0; font-size:22px; border-radius:14px; background:#ffffff33; box-shadow:0 4px 0 #0006;}
+  #pad button:active, #pad button.on{background:#ffffff66;}
+  #soundBtn{position:absolute; right:10px; top:10px; background:#ffffff33; border-radius:50%; width:40px; height:40px; padding:0; font-size:18px; box-shadow:none;}
+  .stars{display:flex; flex-wrap:wrap; gap:6px; justify-content:center; max-width:600px;}
+  .star{font-size:26px; opacity:.25;}
+  .star.on{opacity:1; filter:drop-shadow(0 0 4px #FFD54F);}
+  .trophyGrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(70px,1fr)); gap:8px; max-width:640px; max-height:34vh; overflow-y:auto; padding:8px; background:#00000033; border-radius:10px;}
+  .tCell{background:#ffffff1a; border-radius:10px; padding:6px 2px; font-size:12px;}
+  .tCell .n{font-weight:bold;}
+  #bigScore{font-size:clamp(38px,10vw,90px); font-weight:bold; line-height:1;
+     background:linear-gradient(90deg,var(--blue),var(--purple),var(--pink),var(--green));
+     -webkit-background-clip:text; background-clip:text; color:transparent;
+     animation:pop .6s ease, hue 4s linear infinite; text-shadow:0 4px 0 #0004;}
+  @keyframes pop{ 0%{transform:scale(0)} 70%{transform:scale(1.15)} 100%{transform:scale(1)} }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="c"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="box">Level <span id="hLevel">1</span>/11</div>
+    <div class="box">Score <span id="hScore">0</span></div>
+    <div class="box">Goal <span id="hGoal">0/5</span></div>
+    <div class="box">❤️ <span id="hLives">3</span></div>
+  </div>
+  <button id="soundBtn" class="hidden">🔊</button>
+  <div id="pad" class="hidden">
+    <div></div><button data-dir="up">▲</button><div></div>
+    <button data-dir="left">◀</button><div></div><button data-dir="right">▶</button>
+    <div></div><button data-dir="down">▼</button><div></div>
+  </div>
+
+  <div id="menu" class="screen">
+    <h1>Axolotl World</h1>
+    <p>Freya's game! Swim your axolotl through 11 levels of the reef.
+    Dodge the poisonous seaweed and the glowing red fish.
+    Collect green fish and crabs for points.
+    Watch for the rare secret Tadpole — catch it to skip 3 levels, but it is fast and hard to catch!</p>
+    <p style="opacity:.75; font-size:13px;">Move with the arrow keys, WASD, or the on-screen pad.<br>Music note: this is an original tune, not a real song, made just for this game.</p>
+    <div class="row">
+      <button id="playBtn">▶ Play</button>
+      <button id="customBtn" class="alt">🎨 Customise Axolotl</button>
+      <button id="trophyBtn" class="alt">🏆 Trophy Cabinet</button>
+    </div>
+  </div>
+
+  <div id="customize" class="screen hidden">
+    <h1>Pick Your Colour</h1>
+    <canvas id="customPreview"></canvas>
+    <div class="row" id="swatches"></div>
+    <button id="customBack">✔ Done</button>
+  </div>
+
+  <div id="levelComplete" class="screen hidden">
+    <h1 id="lcTitle">Level Complete!</h1>
+    <div id="lcStar" style="font-size:60px;">⭐</div>
+    <p id="lcText"></p>
+    <button id="lcNext">Next Level ▶</button>
+  </div>
+
+  <div id="trophyCabinet" class="screen hidden">
+    <h1>Trophy Cabinet</h1>
+    <div class="stars" id="starRow"></div>
+    <div class="trophyGrid" id="trophyGrid"></div>
+    <button id="trophyBack">Back</button>
+  </div>
+
+  <div id="end" class="screen hidden">
+    <h1 id="endTitle">Game Over</h1>
+    <div id="bigScore">0</div>
+    <p>points</p>
+    <div class="stars" id="endStars"></div>
+    <div class="row">
+      <button id="againBtn">🔁 Play Again</button>
+      <button id="endTrophyBtn" class="alt">🏆 Trophy Cabinet</button>
+    </div>
+  </div>
+
+</div></div>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------- audio: everything synthesised, nothing pre-recorded ---------- */
+let actx=null, musicGain=null, sfxGain=null, muted=false, musicTimer=null, musicStep=0;
+function ensureAudio(){
+  if(actx) return;
+  actx = new (window.AudioContext||window.webkitAudioContext)();
+  musicGain = actx.createGain(); musicGain.gain.value=0.06; musicGain.connect(actx.destination);
+  sfxGain = actx.createGain(); sfxGain.gain.value=0.16; sfxGain.connect(actx.destination);
+}
+function tone(freq,dur,type,gainNode,vol=1,delay=0){
+  if(!actx) return;
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type; o.frequency.value=freq;
+  const t0=actx.currentTime+delay;
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol,t0+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g); g.connect(gainNode);
+  o.start(t0); o.stop(t0+dur+0.02);
+}
+const sfx = {
+  collect(){ tone(660,.09,'square',sfxGain,1); tone(880,.12,'square',sfxGain,.8,.06); },
+  crab(){ tone(520,.08,'triangle',sfxGain,1); tone(700,.1,'triangle',sfxGain,.8,.05); },
+  hit(){ tone(180,.25,'sawtooth',sfxGain,1); tone(90,.3,'sawtooth',sfxGain,.9,.05); },
+  tadpole(){ [660,880,1100,1320].forEach((f,i)=>tone(f,.14,'square',sfxGain,1,i*.07)); },
+  levelUp(){ [523,659,784,1047].forEach((f,i)=>tone(f,.2,'triangle',sfxGain,1,i*.12)); },
+  gameOver(){ [400,340,280,200].forEach((f,i)=>tone(f,.3,'sawtooth',sfxGain,.9,i*.18)); },
+};
+// original short pentatonic loop -- not a cover of any existing song
+const MELODY = [523,587,659,784,659,587,523,392, 440,523,587,659,587,523,440,392];
+const BASS =   [131,131,165,165,196,196,165,165];
+function musicTick(){
+  const f = MELODY[musicStep % MELODY.length];
+  tone(f,.22,'triangle',musicGain,1);
+  if(musicStep%2===0) tone(BASS[(musicStep/2|0)%BASS.length],.4,'sine',musicGain,.9);
+  musicStep++;
+}
+function startMusic(){ ensureAudio(); if(musicTimer) return; musicTimer=setInterval(musicTick,230); }
+function stopMusic(){ clearInterval(musicTimer); musicTimer=null; }
+document.getElementById('soundBtn').onclick = ()=>{
+  muted=!muted;
+  musicGain.gain.value = muted?0:0.06;
+  sfxGain.gain.value = muted?0:0.16;
+  document.getElementById('soundBtn').textContent = muted?'🔇':'🔊';
+};
+
+/* ---------- axolotl drawing ---------- */
+function shade(hex,amt){
+  const n=parseInt(hex.slice(1),16);
+  let r=(n>>16)+amt, g=(n>>8&255)+amt, b=(n&255)+amt;
+  r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+  return '#'+(1<<24|r<<16|g<<8|b).toString(16).slice(1);
+}
+function drawAxolotl(ctx,x,y,w,h,color,t,flash){
+  ctx.save();
+  ctx.translate(x,y);
+  const wob = Math.sin(t*6)*3;
+  if(flash && Math.floor(t*20)%2===0) ctx.globalAlpha=0.35;
+  // tail
+  ctx.fillStyle=shade(color,-10);
+  ctx.beginPath();
+  ctx.moveTo(-w*0.35,0);
+  ctx.quadraticCurveTo(-w*0.75,wob-h*0.3,-w*0.95,0);
+  ctx.quadraticCurveTo(-w*0.75,-wob+h*0.3,-w*0.35,0);
+  ctx.fill();
+  // body
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.ellipse(0,0,w*0.42,h*0.36,0,0,Math.PI*2);
+  ctx.fill();
+  // head
+  ctx.beginPath();
+  ctx.ellipse(w*0.32,0,w*0.28,h*0.32,0,0,Math.PI*2);
+  ctx.fill();
+  // gills (3 each side)
+  ctx.strokeStyle=shade(color,30); ctx.lineWidth=Math.max(2,w*0.045);
+  for(let s=-1;s<=1;s+=2){
+    for(let i=0;i<3;i++){
+      const gy = -h*0.22 + i*h*0.22 + s*0*0;
+      ctx.beginPath();
+      ctx.moveTo(w*0.46, gy*s*0 + (s* h*0.02) + (i-1)*h*0.16);
+      const baseY=(i-1)*h*0.14;
+      ctx.moveTo(w*0.5, baseY* s + 0);
+      ctx.quadraticCurveTo(w*0.66+s*4, baseY*0+ (s*10)+ (i-1)*6, w*0.6, baseY*0+(s*16)+(i-1)*8);
+      ctx.stroke();
+    }
+  }
+  // simpler cute gill fronds
+  ctx.fillStyle=shade(color,40);
+  for(const s of [-1,1]){
+    for(let i=-1;i<=1;i++){
+      ctx.beginPath();
+      ctx.ellipse(w*0.42, s*h*0.28 + i*h*0.14*0 + s*0, w*0.09,h*0.07,s*0.6,0,Math.PI*2);
+      ctx.ellipse(w*0.42 + i*4, s*(h*0.36), w*0.08,h*0.06, s*0.5,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+  // feet
+  ctx.fillStyle=shade(color,-5);
+  ctx.beginPath(); ctx.ellipse(-w*0.05,h*0.32,w*0.09,h*0.08,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(w*0.12,h*0.34,w*0.09,h*0.08,0,0,Math.PI*2); ctx.fill();
+  // eyes
+  ctx.fillStyle="#08202f";
+  ctx.beginPath(); ctx.arc(w*0.42,-h*0.08,w*0.045,0,Math.PI*2); ctx.fill();
+  // smile
+  ctx.strokeStyle="#08202f"; ctx.lineWidth=Math.max(1.5,w*0.02);
+  ctx.beginPath(); ctx.arc(w*0.38,h*0.05,w*0.08,0.15,1.1); ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------- canvas / sizing ---------- */
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const preview=document.getElementById('customPreview'), pctx=preview.getContext('2d');
+function fitCanvas(){
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*devicePixelRatio; canvas.height=rect.height*devicePixelRatio;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  W=rect.width; H=rect.height;
+}
+let W=900,H=560;
+window.addEventListener('resize',fitCanvas);
+
+/* ---------- colours ---------- */
+const COLORS=[
+  {name:'Blue',hex:'#4FC3F7'},
+  {name:'Purple',hex:'#BA68C8'},
+  {name:'Pink',hex:'#F06292'},
+  {name:'Green',hex:'#66BB6A'},
+];
+let axoColor=localStorage.getItem('axoColor')||COLORS[2].hex;
+function renderSwatches(){
+  const box=document.getElementById('swatches'); box.innerHTML='';
+  COLORS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='swatch'+(c.hex===axoColor?' sel':'');
+    d.style.background=c.hex;
+    d.title=c.name;
+    d.onclick=()=>{ axoColor=c.hex; localStorage.setItem('axoColor',axoColor); renderSwatches(); drawPreview(); };
+    box.appendChild(d);
+  });
+}
+let pTime=0;
+function drawPreview(){
+  preview.width=140*devicePixelRatio; preview.height=140*devicePixelRatio;
+  pctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  pctx.clearRect(0,0,140,140);
+  drawAxolotl(pctx,70,70,90,60,axoColor,pTime,false);
+}
+setInterval(()=>{ pTime+=0.05; if(!document.getElementById('customize').classList.contains('hidden')) drawPreview(); },50);
+
+/* ---------- screens ---------- */
+const screens=['menu','customize','levelComplete','trophyCabinet','end'];
+function show(id){
+  screens.forEach(s=>document.getElementById(s).classList.toggle('hidden', s!==id));
+  const inGame = id===null;
+  document.getElementById('hud').classList.toggle('hidden', !inGame);
+  document.getElementById('pad').classList.toggle('hidden', !inGame);
+  document.getElementById('soundBtn').classList.remove('hidden');
+}
+
+/* ---------- trophy data ---------- */
+let trophies = JSON.parse(localStorage.getItem('trophies')||'[]'); // {level, fish, crab, tadpole}
+function saveTrophies(){ localStorage.setItem('trophies', JSON.stringify(trophies)); }
+function renderTrophyCabinet(){
+  const starRow=document.getElementById('starRow'); starRow.innerHTML='';
+  const grid=document.getElementById('trophyGrid'); grid.innerHTML='';
+  for(let lv=1; lv<=11; lv++){
+    const t = trophies.find(x=>x.level===lv);
+    const s=document.createElement('span'); s.className='star'+(t?' on':''); s.textContent='⭐';
+    starRow.appendChild(s);
+    const cell=document.createElement('div'); cell.className='tCell';
+    cell.innerHTML = t
+      ? `<div class="n">Lv${lv}</div>🐟${t.fish} 🦀${t.crab}${t.tadpole?' 🐸':''}`
+      : `<div class="n">Lv${lv}</div>🔒`;
+    grid.appendChild(cell);
+  }
+}
+
+/* ---------- game state ---------- */
+let game=null;
+function newGame(){
+  return {
+    level:1, score:0, lives:3, goal:5, collected:0,
+    fishThisLevel:0, crabThisLevel:0, tadpoleCaught:false,
+    player:{x:120,y:H/2,w:70,h:46,vx:0,vy:0},
+    obstacles:[], items:[], t:0, spawnTimer:0, invuln:0, running:false,
+  };
+}
+const keys={up:false,down:false,left:false,right:false};
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(['arrowup','w'].includes(k)) keys.up=true;
+  if(['arrowdown','s'].includes(k)) keys.down=true;
+  if(['arrowleft','a'].includes(k)) keys.left=true;
+  if(['arrowright','d'].includes(k)) keys.right=true;
+});
+window.addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(['arrowup','w'].includes(k)) keys.up=false;
+  if(['arrowdown','s'].includes(k)) keys.down=false;
+  if(['arrowleft','a'].includes(k)) keys.left=false;
+  if(['arrowright','d'].includes(k)) keys.right=false;
+});
+document.querySelectorAll('#pad button').forEach(b=>{
+  const dir=b.dataset.dir;
+  const on=e=>{ e.preventDefault(); keys[dir]=true; b.classList.add('on'); };
+  const off=e=>{ e.preventDefault(); keys[dir]=false; b.classList.remove('on'); };
+  b.addEventListener('mousedown',on); b.addEventListener('mouseup',off); b.addEventListener('mouseleave',off);
+  b.addEventListener('touchstart',on,{passive:false}); b.addEventListener('touchend',off); b.addEventListener('touchcancel',off);
+});
+
+function levelGoal(lv){ return 5+lv; }
+function difficulty(lv){ return {speed:1.6+lv*0.28, spawnEvery: Math.max(28, 62-lv*3)}; }
+
+function spawn(){
+  const lv=game.level, d=difficulty(lv);
+  const roll=Math.random();
+  const y = 40+Math.random()*(H-100);
+  if(roll<0.30){
+    game.obstacles.push({type:'seaweed', x:W+20, y, w:26, h:70+Math.random()*40, vx:-d.speed*0.9, bob:Math.random()*10});
+  } else if(roll<0.55){
+    game.obstacles.push({type:'redfish', x:W+20, y, w:44, h:26, vx:-d.speed*1.3, amp:20+Math.random()*20, ph:Math.random()*10});
+  } else if(roll<0.80){
+    game.items.push({type:'greenfish', x:W+20, y, w:34, h:22, vx:-d.speed, ph:Math.random()*10});
+  } else if(roll<0.965){
+    game.items.push({type:'crab', x:W+20, y:H-40, w:30, h:22, vx:-d.speed*0.8});
+  } else if(lv>=2){
+    game.items.push({type:'tadpole', x:W+20, y, w:26, h:20, vx:-d.speed*2.1, ph:Math.random()*10});
+  }
+}
+
+function rectHit(a,b){ return a.x-a.w/2<b.x+b.w/2 && a.x+a.w/2>b.x-b.w/2 && a.y-a.h/2<b.y+b.h/2 && a.y+a.h/2>b.y-b.h/2; }
+
+function update(dt){
+  const g=game, p=g.player;
+  g.t+=dt;
+  const spd=190;
+  p.vx = (keys.right?1:0)-(keys.left?1:0);
+  p.vy = (keys.down?1:0)-(keys.up?1:0);
+  const len=Math.hypot(p.vx,p.vy)||1;
+  p.x += (p.vx/len)*spd*dt;
+  p.y += (p.vy/len)*spd*dt;
+  p.x=Math.max(p.w/2,Math.min(W-p.w/2,p.x));
+  p.y=Math.max(p.h/2,Math.min(H-p.h/2,p.y));
+
+  if(g.invuln>0) g.invuln-=dt;
+
+  g.spawnTimer+=1;
+  const d=difficulty(g.level);
+  if(g.spawnTimer>d.spawnEvery){ g.spawnTimer=0; spawn(); }
+
+  for(const o of g.obstacles){
+    o.x+=o.vx;
+    if(o.type==='redfish') o.y += Math.sin(g.t*3+o.ph)*0.6;
+  }
+  g.obstacles=g.obstacles.filter(o=>o.x>-60);
+
+  for(const it of g.items){
+    it.x+=it.vx;
+    if(it.type==='greenfish') it.y += Math.sin(g.t*3+it.ph)*0.6;
+    if(it.type==='tadpole') it.y += Math.sin(g.t*8+it.ph)*2.2;
+  }
+  g.items=g.items.filter(it=>it.x>-60);
+
+  if(g.invuln<=0){
+    for(const o of g.obstacles){
+      if(rectHit(p,o)){
+        sfx.hit(); g.lives--; g.invuln=1.6;
+        if(g.lives<=0){ endGame(false); return; }
+        break;
+      }
+    }
+  }
+
+  g.items = g.items.filter(it=>{
+    if(!rectHit(p,it)) return true;
+    if(it.type==='greenfish'){ g.score+=10; g.collected++; g.fishThisLevel++; sfx.collect(); }
+    else if(it.type==='crab'){ g.score+=15; g.collected++; g.crabThisLevel++; sfx.crab(); }
+    else if(it.type==='tadpole'){ g.score+=100; g.tadpoleCaught=true; sfx.tadpole(); g.level=Math.min(11,g.level+3); }
+    return false;
+  });
+
+  if(g.collected>=g.goal){ completeLevel(); }
+}
+
+function draw(){
+  const g=game;
+  ctx.clearRect(0,0,W,H);
+  // water background with soft light rays
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#1381c2'); grad.addColorStop(1,'#062a4a');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffffff12';
+  for(let i=0;i<5;i++){
+    ctx.beginPath();
+    const x=(i*180 + (g?g.t*10:0))%(W+200)-100;
+    ctx.moveTo(x,0); ctx.lineTo(x+60,0); ctx.lineTo(x-20,H); ctx.lineTo(x-80,H); ctx.closePath(); ctx.fill();
+  }
+  if(!g) return;
+
+  for(const o of g.obstacles){
+    if(o.type==='seaweed'){
+      ctx.strokeStyle='#7CB342'; ctx.lineWidth=o.w*0.5; ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(o.x,o.y+o.h/2);
+      const wob=Math.sin(g.t*3+o.bob)*14;
+      ctx.quadraticCurveTo(o.x+wob,o.y,o.x,o.y-o.h/2);
+      ctx.stroke();
+      ctx.fillStyle='#AED581';
+      for(let i=-1;i<=1;i++) { ctx.beginPath(); ctx.ellipse(o.x+i*6, o.y-i*o.h*0.28, 6,3,i*0.6,0,7); ctx.fill(); }
+    } else {
+      ctx.save(); ctx.translate(o.x,o.y);
+      ctx.shadowColor='#ff1744'; ctx.shadowBlur=14;
+      ctx.fillStyle='#FF1744';
+      ctx.beginPath(); ctx.ellipse(0,0,o.w/2,o.h/2,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-o.w/2,0); ctx.lineTo(-o.w/2-12,-8); ctx.lineTo(-o.w/2-12,8); ctx.closePath(); ctx.fill();
+      ctx.shadowBlur=0; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(o.w*0.18,-o.h*0.1,3,0,7); ctx.fill();
+      ctx.restore();
+    }
+  }
+  for(const it of g.items){
+    ctx.save(); ctx.translate(it.x,it.y);
+    if(it.type==='greenfish'){
+      ctx.fillStyle='#8BC34A';
+      ctx.beginPath(); ctx.ellipse(0,0,it.w/2,it.h/2,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-it.w/2,0); ctx.lineTo(-it.w/2-10,-7); ctx.lineTo(-it.w/2-10,7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(it.w*0.15,-2,2.4,0,7); ctx.fill();
+    } else if(it.type==='crab'){
+      ctx.fillStyle='#FF8A65';
+      ctx.beginPath(); ctx.ellipse(0,0,it.w/2,it.h/2.4,0,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#FF8A65'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(-it.w/2,-4); ctx.lineTo(-it.w/2-10,-12);
+      ctx.moveTo(it.w/2,-4); ctx.lineTo(it.w/2+10,-12); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-4,-4,2,0,7); ctx.arc(4,-4,2,0,7); ctx.fill();
+    } else {
+      ctx.shadowColor='#FFD54F'; ctx.shadowBlur=16;
+      ctx.fillStyle='#FFD54F';
+      ctx.beginPath(); ctx.ellipse(0,0,it.w/2,it.h/2,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-it.w/2,4,it.w*0.28,it.h*0.5,0.5,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawAxolotl(ctx,g.player.x,g.player.y,g.player.w,g.player.h,axoColor,g.t,g.invuln>0);
+
+  document.getElementById('hLevel').textContent=g.level;
+  document.getElementById('hScore').textContent=g.score;
+  document.getElementById('hGoal').textContent=`${g.collected}/${g.goal}`;
+  document.getElementById('hLives').textContent=g.lives;
+}
+
+let lastT=0;
+function loop(ts){
+  if(!game || !game.running) return;
+  if(!lastT) lastT=ts;
+  const dt=Math.min(0.05,(ts-lastT)/1000); lastT=ts;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+
+function completeLevel(){
+  game.running=false;
+  const existing=trophies.find(t=>t.level===game.level);
+  trophies = trophies.filter(t=>t.level!==game.level);
+  trophies.push({level:game.level, fish:game.fishThisLevel, crab:game.crabThisLevel, tadpole:game.tadpoleCaught});
+  saveTrophies();
+  sfx.levelUp();
+  document.getElementById('lcTitle').textContent = game.level>=11 ? "Reef Champion!" : "Level Complete!";
+  document.getElementById('lcText').textContent = `Score so far: ${game.score}. Fish: ${game.fishThisLevel}  Crabs: ${game.crabThisLevel}${game.tadpoleCaught?'  Secret Tadpole caught!':''}`;
+  document.getElementById('lcNext').textContent = game.level>=11 ? "See Final Score ▶" : "Next Level ▶";
+  show('levelComplete');
+}
+document.getElementById('lcNext').onclick=()=>{
+  if(game.level>=11){ endGame(true); return; }
+  game.level++;
+  game.goal=levelGoal(game.level);
+  game.collected=0; game.fishThisLevel=0; game.crabThisLevel=0; game.tadpoleCaught=false;
+  game.obstacles=[]; game.items=[]; game.spawnTimer=0; game.invuln=1;
+  show(null); game.running=true; lastT=0; requestAnimationFrame(loop);
+};
+
+function endGame(won){
+  game.running=false; stopMusic();
+  sfx.gameOver();
+  document.getElementById('endTitle').textContent = won ? "You Win! 🎉" : "Game Over";
+  document.getElementById('bigScore').textContent = game.score;
+  const stars=document.getElementById('endStars'); stars.innerHTML='';
+  for(let lv=1; lv<=11; lv++){
+    const t=trophies.find(x=>x.level===lv);
+    const s=document.createElement('span'); s.className='star'+(t?' on':''); s.textContent='⭐';
+    stars.appendChild(s);
+  }
+  show('end');
+}
+
+document.getElementById('playBtn').onclick=()=>{
+  ensureAudio(); if(actx.state==='suspended') actx.resume();
+  startMusic();
+  fitCanvas();
+  game=newGame(); game.goal=levelGoal(1); game.player.y=H/2;
+  show(null); game.running=true; lastT=0; requestAnimationFrame(loop);
+};
+document.getElementById('customBtn').onclick=()=>{ show('customize'); renderSwatches(); drawPreview(); };
+document.getElementById('customBack').onclick=()=>{ show('menu'); };
+document.getElementById('trophyBtn').onclick=()=>{ renderTrophyCabinet(); show('trophyCabinet'); };
+document.getElementById('trophyBack').onclick=()=>{ show('menu'); };
+document.getElementById('endTrophyBtn').onclick=()=>{ renderTrophyCabinet(); show('trophyCabinet'); };
+document.getElementById('againBtn').onclick=()=>{
+  ensureAudio(); if(actx.state==='suspended') actx.resume();
+  startMusic(); fitCanvas();
+  game=newGame(); game.goal=levelGoal(1); game.player.y=H/2;
+  show(null); game.running=true; lastT=0; requestAnimationFrame(loop);
+};
+
+fitCanvas();
+draw();
+show('menu');
+})();
+</script>
+</body>
+</html>
