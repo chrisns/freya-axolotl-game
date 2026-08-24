@@ -4,6 +4,8 @@ A browser game designed by Freya, age 7. Axolotls are her favourite animal.
 
 Play it here: https://chrisns.github.io/freya-axolotl-game/
 
+![Gameplay](screenshots/gameplay.jpg)
+
 ## How to play
 
 Swim your axolotl through 11 levels of the reef.
@@ -29,6 +31,16 @@ touch controls work at the same time.
 - Original chiptune background music and sound effects, built with the
   Web Audio API. This is not a cover of a real song. It is an original
   tune made for this game.
+
+## Screenshots
+
+| Menu | Colour picker |
+|---|---|
+| ![Menu](screenshots/menu.jpg) | ![Colour picker](screenshots/customise.jpg) |
+
+| Trophy cabinet | Win screen |
+|---|---|
+| ![Trophy cabinet](screenshots/trophy-cabinet.jpg) | ![Win screen](screenshots/win-screen.jpg) |
 
 ## Run it locally
 
